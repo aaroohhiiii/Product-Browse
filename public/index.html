@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProductBrowse</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --surface: #1a1a1a;
+      --border: #2a2a2a;
+      --accent: #6366f1;
+      --text-primary: #f5f5f5;
+      --text-muted: #71717a;
+      --header-height: 60px;
+      --filter-bar-height: 60px;
+    }
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      background-color: var(--bg);
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      line-height: 1.5;
+    }
+
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--header-height);
+      background-color: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      z-index: 100;
+    }
+
+    .header-logo {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .header-tagline {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .filter-bar {
+      position: sticky;
+      top: var(--header-height);
+      background-color: rgba(15, 15, 15, 0.9);
+      backdrop-filter: blur(8px);
+      height: var(--filter-bar-height);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      z-index: 90;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .category-select {
+      background-color: var(--surface);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.875rem;
+      outline: none;
+    }
+
+    .category-select:focus {
+      border-color: var(--accent);
+    }
+
+    .result-count {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    main {
+      padding: 2rem;
+      margin-top: var(--header-height);
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .product-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 600px) {
+      .product-grid { grid-template-columns: 1fr; }
+      header { padding: 0 1rem; }
+      .filter-bar { padding: 0 1rem; }
+      main { padding: 1rem; }
+    }
+
+    .product-card {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .product-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent);
+    }
+
+    .product-name {
+      font-size: 1.125rem;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .product-category {
+      align-self: flex-start;
+      background-color: rgba(99, 102, 241, 0.1);
+      color: var(--accent);
+      padding: 0.25rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    .product-price {
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .product-date {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: auto;
+    }
+
+    .load-more-container {
+      text-align: center;
+      margin-top: 3rem;
+      margin-bottom: 2rem;
+    }
+
+    .btn {
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.75rem 2rem;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background-color 0.2s;
+    }
+
+    .btn:hover {
+      background-color: #4f46e5;
+    }
+
+    .btn:disabled {
+      background-color: var(--border);
+      color: var(--text-muted);
+      cursor: not-allowed;
+    }
+
+    .no-more {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Skeleton Loader */
+    .skeleton-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+    
+    @media (max-width: 900px) {
+      .skeleton-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 600px) {
+      .skeleton-grid { grid-template-columns: 1fr; }
+    }
+
+    .skeleton-card {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      height: 180px;
+    }
+
+    .skeleton-line {
+      background-color: var(--border);
+      border-radius: 4px;
+      animation: pulse 1.5s infinite ease-in-out;
+    }
+
+    .skeleton-line.title { height: 1.125rem; width: 80%; }
+    .skeleton-line.pill { height: 1.5rem; width: 40%; border-radius: 9999px; }
+    .skeleton-line.price { height: 1.5rem; width: 50%; }
+    .skeleton-line.date { height: 0.75rem; width: 30%; margin-top: auto; }
+
+    @keyframes pulse {
+      0% { opacity: 0.5; }
+      50% { opacity: 1; }
+      100% { opacity: 0.5; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-logo">ProductBrowse</div>
+    <div class="header-tagline">Fast. Scalable. Pagination.</div>
+  </header>
+
+  <div class="filter-bar">
+    <select id="category-filter" class="category-select">
+      <option value="">All Categories</option>
+      <option value="Electronics">Electronics</option>
+      <option value="Clothing">Clothing</option>
+      <option value="Books">Books</option>
+      <option value="Home & Kitchen">Home & Kitchen</option>
+      <option value="Sports">Sports</option>
+      <option value="Toys">Toys</option>
+      <option value="Beauty">Beauty</option>
+      <option value="Automotive">Automotive</option>
+      <option value="Garden">Garden</option>
+      <option value="Food">Food</option>
+    </select>
+    <div class="result-count"><span id="count-display">0</span> products</div>
+  </div>
+
+  <main>
+    <div id="product-grid" class="product-grid"></div>
+    
+    <div id="skeleton-container" class="skeleton-grid hidden">
+      <div class="skeleton-card">
+        <div class="skeleton-line title"></div>
+        <div class="skeleton-line pill"></div>
+        <div class="skeleton-line price"></div>
+        <div class="skeleton-line date"></div>
+      </div>
+      <div class="skeleton-card">
+        <div class="skeleton-line title"></div>
+        <div class="skeleton-line pill"></div>
+        <div class="skeleton-line price"></div>
+        <div class="skeleton-line date"></div>
+      </div>
+      <div class="skeleton-card">
+        <div class="skeleton-line title"></div>
+        <div class="skeleton-line pill"></div>
+        <div class="skeleton-line price"></div>
+        <div class="skeleton-line date"></div>
+      </div>
+    </div>
+
+    <div class="load-more-container">
+      <button id="load-more-btn" class="btn hidden">Load More</button>
+      <p id="no-more-text" class="no-more hidden">No more products</p>
+    </div>
+  </main>
+
+  <script>
+    // State variables
+    let currentCursor = null;
+    let currentCategory = '';
+    let isLoading = false;
+    let hasMore = true;
+    let totalLoaded = 0;
+
+    const grid = document.getElementById('product-grid');
+    const skeleton = document.getElementById('skeleton-container');
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    const noMoreText = document.getElementById('no-more-text');
+    const categoryFilter = document.getElementById('category-filter');
+    const countDisplay = document.getElementById('count-display');
+
+    const priceFormatter = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
+
+    function renderCard(product) {
+      const dateStr = new Date(product.created_at).toLocaleDateString('en-GB', {
+        day: 'numeric', month: 'short', year: 'numeric'
+      });
+      const priceStr = priceFormatter.format(product.price);
+      
+      return `
+        <div class="product-card">
+          <div class="product-name">${product.name}</div>
+          <div class="product-category">${product.category}</div>
+          <div class="product-price">${priceStr}</div>
+          <div class="product-date">Added on ${dateStr}</div>
+        </div>
+      `;
+    }
+
+    async function fetchProducts(reset = false) {
+      if (isLoading) return;
+      isLoading = true;
+      
+      if (reset) {
+        currentCursor = null;
+        totalLoaded = 0;
+        grid.innerHTML = '';
+        hasMore = true;
+      }
+
+      loadMoreBtn.classList.add('hidden');
+      noMoreText.classList.add('hidden');
+      skeleton.classList.remove('hidden');
+
+      try {
+        let url = '/api/products?limit=20';
+        if (currentCursor && !reset) {
+          url += `&cursor=${encodeURIComponent(currentCursor)}`;
+        }
+        if (currentCategory) {
+          url += `&category=${encodeURIComponent(currentCategory)}`;
+        }
+
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.data && data.data.length > 0) {
+          const cardsHtml = data.data.map(p => renderCard(p)).join('');
+          grid.innerHTML += cardsHtml;
+          totalLoaded += data.data.length;
+        }
+
+        currentCursor = data.nextCursor;
+        hasMore = data.hasMore;
+        countDisplay.textContent = totalLoaded;
+
+        if (hasMore) {
+          loadMoreBtn.classList.remove('hidden');
+        } else {
+          noMoreText.classList.remove('hidden');
+        }
+
+      } catch (err) {
+        console.error("Failed to fetch products", err);
+      } finally {
+        isLoading = false;
+        skeleton.classList.add('hidden');
+      }
+    }
+
+    categoryFilter.addEventListener('change', (e) => {
+      currentCategory = e.target.value;
+      fetchProducts(true);
+    });
+
+    loadMoreBtn.addEventListener('click', () => {
+      fetchProducts(false);
+    });
+
+    // Initial load
+    fetchProducts(true);
+  </script>
+</body>
+</html>
