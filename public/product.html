@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Details - ProductBrowse</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --surface: #ffffff;
+      --border: #000000;
+      --accent: #000000;
+      --accent-hover: #333333;
+      --text-primary: #000000;
+      --text-muted: #555555;
+      --header-height: 70px;
+    }
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      background: var(--bg);
+      background-attachment: fixed;
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--header-height);
+      background-color: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      z-index: 100;
+    }
+
+    .header-logo {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      text-decoration: none;
+    }
+
+    main {
+      padding: 2rem;
+      margin-top: var(--header-height);
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-weight: 500;
+      margin-bottom: 2rem;
+      transition: color 0.2s;
+    }
+
+    .back-link:hover {
+      color: var(--text-primary);
+    }
+
+    .product-details-card {
+      background-color: var(--surface);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .product-category {
+      align-self: flex-start;
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 0.5rem 1rem;
+      border-radius: 9999px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .product-name {
+      font-size: 2.5rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.2;
+    }
+
+    .product-price {
+      font-size: 2rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .product-meta {
+      display: flex;
+      gap: 2rem;
+      margin-top: 1rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .meta-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .meta-value {
+      font-size: 0.95rem;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+
+
+    .loading {
+      text-align: center;
+      padding: 4rem;
+      color: var(--text-muted);
+    }
+
+    .error {
+      text-align: center;
+      padding: 4rem;
+      color: #ef4444;
+      background-color: rgba(239, 68, 68, 0.1);
+      border-radius: 12px;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="/" class="header-logo">ProductBrowse</a>
+  </header>
+
+  <main>
+    <a href="/" class="back-link">&larr; Back to Products</a>
+
+    <div id="loading" class="loading">Loading product details...</div>
+    <div id="error" class="error hidden">Product not found.</div>
+
+    <div id="product-details" class="product-details-card hidden">
+      <div id="p-category" class="product-category">Category</div>
+      <h1 id="p-name" class="product-name">Product Name</h1>
+      <div id="p-price" class="product-price">₹0.00</div>
+
+
+      <div class="product-meta">
+        <div class="meta-item">
+          <span class="meta-label">Product ID</span>
+          <span id="p-id" class="meta-value">#123</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Date Added</span>
+          <span id="p-date" class="meta-value">Jan 1, 2026</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const priceFormatter = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
+
+    async function loadProduct() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const id = urlParams.get('id');
+
+      const loadingEl = document.getElementById('loading');
+      const errorEl = document.getElementById('error');
+      const detailsEl = document.getElementById('product-details');
+
+      if (!id) {
+        loadingEl.classList.add('hidden');
+        errorEl.textContent = 'No product ID provided.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/products/${id}`);
+        if (!res.ok) throw new Error('Failed to fetch');
+        
+        const product = await res.json();
+
+        // Populate UI
+        document.getElementById('p-category').textContent = product.category;
+        document.getElementById('p-name').textContent = product.name;
+        document.getElementById('p-price').textContent = priceFormatter.format(product.price);
+        document.getElementById('p-id').textContent = `#${product.id}`;
+        
+        const dateStr = new Date(product.created_at).toLocaleDateString('en-GB', {
+          day: 'numeric', month: 'short', year: 'numeric'
+        });
+        document.getElementById('p-date').textContent = dateStr;
+        
+        // Show details
+        loadingEl.classList.add('hidden');
+        detailsEl.classList.remove('hidden');
+
+      } catch (err) {
+        console.error(err);
+        loadingEl.classList.add('hidden');
+        errorEl.classList.remove('hidden');
+      }
+    }
+
+    loadProduct();
+  </script>
+</body>
+</html>
