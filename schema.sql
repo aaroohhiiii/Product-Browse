@@ -20,7 +20,8 @@ CREATE TABLE products (
   category VARCHAR(100) NOT NULL,
   price NUMERIC(10, 2) NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  search_vector tsvector GENERATED ALWAYS AS (to_tsvector('english', name)) STORED
 );
 
 -- INDEX 1: Compound index on (created_at DESC, id DESC)
@@ -36,3 +37,19 @@ CREATE INDEX idx_products_created_at_id ON products (created_at DESC, id DESC);
 -- in one index scan. Without this, Postgres would use the category filter OR the 
 -- cursor index but not both efficiently.
 CREATE INDEX idx_products_category_created_at_id ON products (category, created_at DESC, id DESC);
+
+-- INDEX 3: GIN index on search_vector for fast full-text search
+CREATE INDEX idx_products_search_vector ON products USING gin(search_vector);
+
+-- INDEX 4: Compound index on (price ASC, id ASC) for sorting by price low-to-high
+CREATE INDEX idx_products_price_asc_id ON products (price ASC, id ASC);
+
+-- INDEX 5: Compound index on (price DESC, id DESC) for sorting by price high-to-low
+CREATE INDEX idx_products_price_desc_id ON products (price DESC, id DESC);
+
+-- INDEX 6: Compound index on (category, price ASC, id ASC) for category filtering and sorting by price low-to-high
+CREATE INDEX idx_products_category_price_asc_id ON products (category, price ASC, id ASC);
+
+-- INDEX 7: Compound index on (category, price DESC, id DESC) for category filtering and sorting by price high-to-low
+CREATE INDEX idx_products_category_price_desc_id ON products (category, price DESC, id DESC);
+
