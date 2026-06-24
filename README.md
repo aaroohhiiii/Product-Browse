@@ -1,6 +1,6 @@
 # ProductBrowse
 
-A backend API for browsing 200,000 products with stable cursor-based pagination and category filtering. Built as a take-home assignment for CodeVector.
+A backend API for browsing 200,000 products with stable cursor-based pagination, dynamic sorting, prefix-aware full-text search, and category filtering. Built as a take-home assignment for CodeVector.
 
 **Live URL:** https://product-browse.onrender.com
 
@@ -22,35 +22,29 @@ This API uses cursor-based pagination to solve both. Each response returns a cur
 
 - **Runtime:** Node.js + Express
 - **Database:** PostgreSQL (hosted on Supabase)
+- **Validation:** Zod
+- **Protection:** Express-Rate-Limit
+- **Testing:** Jest + Supertest
 - **Deployed on:** Render
 
 ---
 
 ## Project Structure
 /
-
 ├── src/
-
-│   ├── index.js          # Express app entry point
-
+│   ├── index.js          # Express app entry point & rate limit setup
 │   ├── db.js             # PostgreSQL connection pool
-
 │   ├── routes/
-
-│   │   └── products.js   # Pagination + filter logic
-
+│   │   └── products.js   # Pagination, filter, validation & search logic
 │   └── utils/
-
-│       └── cursor.js     # Cursor encode/decode helpers
-
+│       └── cursor.js     # Dynamic Cursor encode/decode helpers
 ├── public/
-
-│   └── index.html        # Frontend UI (vanilla JS)
-
-├── schema.sql            # Table definition + indexes
-
+│   └── index.html        # Frontend UI (vanilla JS + search/sort/categories integration)
+├── tests/
+│   └── products.test.js  # Jest + Supertest integration tests
+├── schema.sql            # Table definition + core indexes
+├── migration.js          # One-time migration script (sets up FTS column and indexes)
 ├── seed.js               # Generates and inserts 200k products
-
 └── .env.example          # Environment variable template
 
 ---
@@ -69,21 +63,33 @@ npm install
 cp .env.example .env
 ```
 Fill in your Supabase session pooler connection string:
-DATABASE_URL=postgresql://postgres.xxxx:password@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
+`DATABASE_URL=postgresql://postgres.xxxx:password@aws-0-ap-south-1.pooler.supabase.com:5432/postgres`
 
-PORT=3000
+`PORT=3000`
 
 **3. Run the schema**
 
-Go to Supabase SQL editor, paste the contents of `schema.sql` and run it. This creates the products table and both indexes.
+Go to Supabase SQL editor, paste the contents of `schema.sql` and run it. This creates the products table and basic indexes.
 
-**4. Seed the database**
+**4. Run database migrations**
+```bash
+node migration.js
+```
+This automatically configures the PostgreSQL full-text search generated column, builds the GIN search index, and creates B-Tree indexes for price sorting.
+
+**5. Seed the database**
 ```bash
 npm run seed
 ```
 Inserts 200,000 products in batches of 1,000. Takes under 60 seconds.
 
-**5. Start the server**
+**6. Run the test suite**
+```bash
+npm run test
+```
+Runs the full suite of integration tests verifying pagination stability, category filtering, search keywords, price sorting, and request validation.
+
+**7. Start the server**
 ```bash
 npm run dev
 ```
@@ -93,99 +99,92 @@ Server runs at `http://localhost:3000`
 
 ## API Reference
 
+### GET /api/health
+
+Health check endpoint.
+
+**Response**
+```json
+{
+  "status": "ok"
+}
+```
+
+### GET /api/products/categories
+
+Fetch distinct list of categories. Cached in-memory for 10 minutes.
+
+**Response**
+```json
+[
+  "Automotive",
+  "Beauty",
+  "Books",
+  "Clothing",
+  "Electronics",
+  "Food",
+  "Garden",
+  "Home & Kitchen",
+  "Sports",
+  "Toys"
+]
+```
+
 ### GET /api/products
 
-Fetch a paginated list of products, newest first.
+Fetch a paginated list of products.
 
 **Query Parameters**
 
 | Parameter  | Type   | Required | Description |
 |------------|--------|----------|-------------|
-| limit      | number | No       | Products per page. Default 20, max 100 |
-| cursor     | string | No       | Cursor from previous response. Omit for first page |
-| category   | string | No       | Filter by category name |
+| limit      | number | No       | Products per page. Default 20, max 100. |
+| cursor     | string | No       | Cursor from previous response. Omit for first page. |
+| category   | string | No       | Filter by category name. |
+| search     | string | No       | Search term. Supports prefix matching (e.g. `wood ch` matching `Wooden Chair`). |
+| sort       | string | No       | Sort key. Choice of: `newest` (default), `price_asc` (price low-to-high), `price_desc` (price high-to-low). |
 
 **Example Requests**
 
-First page:
-GET /api/products
+First page with price sorting:
+`GET /api/products?limit=20&sort=price_asc`
 
-GET /api/products?limit=20
-
-With category filter:
-GET /api/products?category=Electronics
+With category & keyword search:
+`GET /api/products?category=Electronics&search=smart`
 
 Next page (paste cursor from previous response):
-GET /api/products?cursor=eyJjcmVhdGVkX2F0IjoiMjAyNC0wMy0xNVQxMDozMDowMC4wMDBaIiwiaWQiOjU0MzJ9
-
-Combined:
-GET /api/products?category=Electronics&cursor=eyJjcmVhdGVkX2F0Ijoi...&limit=20
-
-**Response**
-```json
-{
-  "data": [
-    {
-      "id": 54320,
-      "name": "Ergonomic Wooden Chair",
-      "category": "Home & Kitchen",
-      "price": "4299.99",
-      "created_at": "2024-03-15T10:30:00.000Z",
-      "updated_at": "2024-03-15T10:30:00.000Z"
-    }
-  ],
-  "nextCursor": "eyJjcmVhdGVkX2F0IjoiMjAyNC0wMy0xNVQxMDozMDowMC4wMDBaIiwiaWQiOjU0MzJ9",
-  "hasMore": true,
-  "count": 20
-}
-```
-
-When `nextCursor` is `null` and `hasMore` is `false`, you have reached the last page.
+`GET /api/products?cursor=eyJzb3J0RmllbGQiOiJjcmVhdGVkX2F0Iiwic29ydFZhbHVlIjoiMjAyNC0wMy0xNVQxMDozMDowMC4wMDBaIiwiaWQiOjU0MzJ9`
 
 ---
 
 ## Key Design Decisions
 
-**Cursor pagination over offset**
+**Dynamic Multi-Key Cursor pagination**
 
-Offset pagination scans and discards rows on every request. At 200k rows, deep pages are slow and inserts during browsing cause duplicates or skipped items. Cursor pagination uses an index to jump directly to the right position every time. Every page is equally fast regardless of depth.
+Using cursor pagination with sorting options means the pagination field changes depending on the sorting column (e.g., sorting by price uses `(price, id)` while sorting by date uses `(created_at, id)`). Our cursor encodes the active `sortField`, `sortValue`, and `id` tiebreaker. 
 
-**Compound cursor (created_at, id)**
+**Backward Compatibility**
 
-Using only `created_at` as the cursor breaks when multiple products share the same timestamp, which happens frequently after bulk inserts. Adding `id` as a tiebreaker makes the cursor unambiguous since id is always unique.
+The cursor decoder dynamically detects older pagination formats (which only contained `created_at` and `id`) and converts them on the fly. This prevents any broken user links or cached browser cursors when deploying updates.
 
-**Two indexes**
+**Request Validation**
 
-`(created_at DESC, id DESC)` for unfiltered pagination. `(category, created_at DESC, id DESC)` for filtered pagination. Without the second index, a category filter would force a full table scan before applying the cursor.
+Using Zod schemas ensures that incoming query arguments (like `limit` or `sort`) are type-checked and sanitized, blocking malformed input before hit requests reach the database layer.
 
-**limit + 1 trick**
+**Rate Limiting**
 
-We fetch one extra row per request to determine if a next page exists, instead of running a separate COUNT query. COUNT on a large filtered table is expensive. Fetching one extra row costs nothing.
+Protected API endpoints using `express-rate-limit` capped at 100 requests per minute per IP to safeguard resources against excessive scrapers or DOS attempts.
 
-**Batch inserts in seed script**
+**Prefix GIN Full-Text Search**
 
-Inserting 200k rows one at a time would require 200,000 network round trips to the database. Batching 1,000 rows per INSERT reduces that to 200 round trips. The entire seed runs in under 60 seconds wrapped in a single transaction so a failed run leaves no partial data.
+Utilizes PostgreSQL `tsvector` with a compiled generated column (`search_vector`) indexed via a GIN index. Search phrases are converted dynamically into prefix matching tsqueries (e.g., `term:*`) to achieve extremely fast substring results on 200,000 rows.
 
-**NUMERIC(10,2) for price**
+**Category caching**
 
-Floating point types (FLOAT, DOUBLE) cannot represent all decimal values exactly. `0.1 + 0.2` in a float is `0.30000000000000004`. For money this is a real bug. NUMERIC stores exact decimal values.
-
-**TIMESTAMPTZ over TIMESTAMP**
-
-TIMESTAMPTZ stores all timestamps in UTC internally and converts on read. TIMESTAMP stores no timezone info, which causes silent bugs if the server region changes or the app goes global.
-
----
-
-## What I'd Improve With More Time
-
-- Full text search on product name using a GIN index on a tsvector column
-- A `/api/categories` endpoint returning distinct categories dynamically from the DB instead of hardcoding them in the frontend
-- Rate limiting on the API
-- Integration tests for cursor edge cases, particularly around same-timestamp products
-- A proper CI pipeline that runs the seed script and hits the API before deploying
+Distinct categories are cached in memory for 10 minutes. Since product catalogs rarely add new categories in high frequencies, this completely removes database pressure on initial page loads.
 
 ---
 
 ## Note on AI Usage
 
-I used Claude throughout this project. It helped me think through the pagination approach, scaffold the structure, and speed up implementation. The most useful thing was using it to reason through tradeoffs rather than just generate code. For example, understanding why cursor pagination solves the stable browsing requirement that offset pagination can't, catching that the seed script needed a transaction so a failed run doesn't leave partial data, and understanding why the composite index needs category as the leftmost column. All comments in the code reflect what I actually understand about each decision.
+I used Gemini throughout this project. It helped me think through the pagination approach, scaffold the structure, speed up implementation, and implement robust backend extensions like price sorting, input validation, rate limiting, and dynamic categories. The most useful thing was using it to reason through tradeoffs rather than just generate code. For example, understanding why cursor pagination solves the stable browsing requirement that offset pagination can't, catching that the seed script needed a transaction so a failed run doesn't leave partial data, and understanding why the composite index needs category as the leftmost column. All comments in the code reflect what I actually understand about each decision.
