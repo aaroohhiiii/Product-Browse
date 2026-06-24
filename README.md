@@ -183,8 +183,26 @@ Utilizes PostgreSQL `tsvector` with a compiled generated column (`search_vector`
 
 Distinct categories are cached in memory for 10 minutes. Since product catalogs rarely add new categories in high frequencies, this completely removes database pressure on initial page loads.
 
+**Decisions I Made Manually**
+
+* **Frontend Cursor History Stack**: Cursor-based pagination is inherently forward-only. Instead of maintaining state on the server, I manually implemented a client-side stack (`pageHistory`) in the frontend. Cursors are pushed as the user moves forward and popped when going backward, keeping the server completely stateless.
+* **Client-Side Search Debouncing**: To protect the database from query spam, I implemented a 300ms debounce wrapper on the search input, ensuring we only query the API after the user has finished typing.
+* **Brutalist CSS Variables & Theme**: Swapped the UI to a crisp black-and-white theme using pure CSS variables. This allowed structural adjustments (like grid layouts) without installing frameworks, keeping files lightweight.
+* **Zero-Dependency Cursors**: Used Node.js native `Buffer` class to handle base64 encoding and decoding of JSON cursors rather than using external packages, reducing the dependency footprint.
+
 ---
 
 ## Note on AI Usage
 
-I used Gemini throughout this project. It helped me think through the pagination approach, scaffold the structure, speed up implementation, and implement robust backend extensions like price sorting, input validation, rate limiting, and dynamic categories. The most useful thing was using it to reason through tradeoffs rather than just generate code. For example, understanding why cursor pagination solves the stable browsing requirement that offset pagination can't, catching that the seed script needed a transaction so a failed run doesn't leave partial data, and understanding why the composite index needs category as the leftmost column. All comments in the code reflect what I actually understand about each decision.
+I used Claude to understand the underlying logic and significance of the architectural decisions (such as cursor-based pagination and optimal compound indexes) and to construct a scaffold prompt. I then used Antigravity to execute and write the actual implementation.
+
+For instance, Claude helped reason through critical trade-offs:
+* **Cursor Stability**: Understanding why cursor-based pagination is necessary to guarantee stable browsing when new products are dynamically inserted, preventing rows from shifting.
+* **Leftmost Index Sorting**: Understanding why the compound database indexes need the `category` column on the leftmost side so Postgres can execute fast index-only scans for dynamic categories.
+
+Antigravity was then used to fully execute the code changes, including:
+* **Dynamic Cursors**: Implementing the dynamic cursor encoding/decoding system with backward compatibility.
+* **Protection Middleware**: Configuring the Zod validation schemas and Express rate limiters.
+* **Testing**: Setting up the Jest & Supertest integration suite to mathematically verify pagination consistency.
+
+All comments in the code and design decisions reflect what I actually understand and verified.
